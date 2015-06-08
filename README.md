@@ -12,4 +12,5 @@ Usage: lenex_to_newspaper.rb [options]
 
 
 example: ./lenex_to_newspaper.rb -l Morges.lxf  -p 5 -c RFN,CNCF 
+
 result: this will extra all the results for the given LXF file (which is compressed XML) for RFN and CNCF for those swimmers who were either 1,2,3,4, or 5 placed.
