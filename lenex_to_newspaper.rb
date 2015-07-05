@@ -25,10 +25,10 @@ translation_nl = {"FLY" => "Vlinderslag", "BACK" => "Rugslag", "BREAST" => "Scho
 translation = translation_fr
 
 
-age_group_sort_order=["11 #{translation["YEAR"]} #{translation["ANDLESS"]}", "11 #{translation["YEAR"]}", "12 #{translation["YEAR"]} #{translation["ANDLESS"]}", "12 #{translation["YEAR"]}", "13 #{translation["YEAR"]} #{translation["ANDLESS"]}", "13 #{translation["YEAR"]}", 
-  "29 #{translation["YEAR"]} #{translation["ANDLESS"]}", "11-12 #{translation["YEAR"]}", "12-13 #{translation["YEAR"]}", "13-14 #{translation["YEAR"]}", "14-15 #{translation["YEAR"]}", 
-  "15-16 #{translation["YEAR"]}", "16-29 #{translation["YEAR"]}", "17 #{translation["YEAR"]} #{translation["ANDMORE"]}", "18 #{translation["YEAR"]} #{translation["ANDMORE"]}", 
-  "30-34 #{translation["YEAR"]}", "35-39 #{translation["YEAR"]}", "40-44 #{translation["YEAR"]}", "45-49 #{translation["YEAR"]}", "Open"]
+age_group_sort_order=["11 #{translation["YEAR"]} #{translation["ANDLESS"]}", "12 #{translation["YEAR"]} #{translation["ANDLESS"]}", "13 #{translation["YEAR"]} #{translation["ANDLESS"]}", 
+  "29 #{translation["YEAR"]} #{translation["ANDLESS"]}", "11 - 12 #{translation["YEAR"]}", "12 - 13 #{translation["YEAR"]}", "13 - 14 #{translation["YEAR"]}", "14 - 15 #{translation["YEAR"]}", 
+  "15 - 16 #{translation["YEAR"]}", "16 - 29 #{translation["YEAR"]}", "17 #{translation["YEAR"]} #{translation["ANDMORE"]}", "18 #{translation["YEAR"]} #{translation["ANDMORE"]}", 
+  "30 - 34 #{translation["YEAR"]}", "35 - 39 #{translation["YEAR"]}", "40 - 44 #{translation["YEAR"]}", "45 - 49 #{translation["YEAR"]}", "Open"]
 gender_sort_order=["F", "M"]
 stroke_sort_order=["FLY", "BACK", "BREAST", "FREE", "MEDLEY"]
 stroke_distance_sort_order=["25m", "50m", "100m", "200m", "400m", "800m", "1500m"]
@@ -99,12 +99,13 @@ options[:clubcodes].split(",").each do |club|
           agemax      = doc.at_xpath("//EVENTS/EVENT[@eventid='#{result["eventid"]}']//RANKING[@resultid='#{result["resultid"]}']").parent.parent['agemax'].to_i
           agemin      = doc.at_xpath("//EVENTS/EVENT[@eventid='#{result["eventid"]}']//RANKING[@resultid='#{result["resultid"]}']").parent.parent['agemin'].to_i
         
-          ((agemax == agemin) ? ((agemax == -1) ? agegroup = "Open" : agegroup = "#{agemin} #{translation["YEAR"]}") : (agemin == -1) ? agegroup = "#{agemax} #{translation["YEAR"]} #{translation["ANDLESS"]}" : ((agemax == -1) ? agegroup = "#{agemin} #{translation["YEAR"]} #{translation["ANDMORE"]}" : agegroup = "#{agemin}-#{agemax} #{translation["YEAR"]}"))
+          #(agemin == -1) ? agegroup = "#{agemax} #{translation["YEAR"]} #{translation["ANDLESS"]}" : ((agemax == -1) ? agegroup = "#{agemin} #{translation["YEAR"]} #{translation["ANDMORE"]}" : agegroup = "#{agemin} - #{agemax} #{translation["YEAR"]}")
+          (agemin == -1) ? (agemax == -1 ? agegroup = "Open" : agegroup = "#{agemax} #{translation["YEAR"]} #{translation["ANDLESS"]}") : ((agemax == -1) ? agegroup = "#{agemin} #{translation["YEAR"]} #{translation["ANDMORE"]}" : agegroup = "#{agemin} - #{agemax} #{translation["YEAR"]}")
         
           distance    = event.at_xpath('./SWIMSTYLE')['distance']+"m"
           stroke      = translation[event.at_xpath('./SWIMSTYLE')['stroke']]
           place       = doc.at_xpath("//RANKING[@resultid='#{result["resultid"]}']")['place'].to_i
-          time        = result['swimtime'].gsub(":", "'").gsub('.', '"')[3..-1].sub!(/^[0]*'*/,'')
+          time        = result['swimtime'].gsub(":", "'").gsub('.', '"')[3..-1]
           round       = translation[doc.at_xpath("//EVENT[@eventid='#{result["eventid"]}']")['round']]
           status      = result['status']
         
@@ -148,19 +149,15 @@ stroke_sort_order.each do |stroke|
   
     print "\e[1m#{translation['FIN']+" " if options[:onlyfinals]}#{distance} #{translation[stroke]} \e[0m"
   
-    #3th loop gender
-    gender_sort_order.each do |gender|
-      swimmer_strokes_distance_gender = swimmer_strokes_distance.select {|swimmer| swimmer[:gender] == gender}
-      next if swimmer_strokes_distance_gender.size == 0 # well, there are no entries for this gender, so we move on to the next one
-      
-      #print "\e[1m#{translation[gender]} \e[0m"
+    #3rd loop - the age_group 
+    age_group_sort_order.each do |age_group|
+      swimmer_strokes_distance_agegroup = swimmer_strokes_distance.select {|swimmer| swimmer[:age_group] == age_group}
+      next if swimmer_strokes_distance_agegroup.size == 0 # well, there are no entries for this age_group, so we move on to the next one
     
-      #4th loop - the age_group 
-      age_group_sort_order.each do |age_group|
-        swimmer_strokes_distance_gender_agegroup = swimmer_strokes_distance_gender.select {|swimmer| swimmer[:age_group] == age_group}
-        next if swimmer_strokes_distance_gender_agegroup.size == 0 # well, there are no entries for this age_group, so we move on to the next one
     
-        swimmers = swimmer_strokes_distance_gender_agegroup.select {|swimmer| swimmer[:age_group] == age_group}.sort_by{|a| a[:place]}
+      #4th loop gender
+      gender_sort_order.each do |gender|
+        swimmers = swimmer_strokes_distance_agegroup.select {|swimmer| swimmer[:gender] == gender}.sort_by{|a| a[:place]}
         #puts age_group
         next if swimmers.size == 0 # well, there are no entries for this age_group, so we move on to the next one
       
@@ -168,12 +165,32 @@ stroke_sort_order.each do |stroke|
       
         print "\e[1m#{translation[gender]} #{age_group}:\e[0m"
       
+        # find if there are finalists, if there are, find the series time, add it to the time entry and delete the series time
+        swimmers.each do |swimmer|
+          if swimmer[:round].eql?(translation["FIN"]) then
+            # found a swimmer who swam the final, find the series entry
+            swimmer_series_entry =  swimmers.select{|a| (a[:name] == swimmer[:name]) &&  (a[:round] == translation["PRE"])}
+            if swimmer_series_entry.size != 0 then
+              # there is an entry for the same swimmer, same distance but on swum in the series
+              # adjust the time text in the final entry (and include also the place in the series)
+              swimmer[:time] = "#{swimmer[:time]} (#{translation["PRE"]} #{swimmer_series_entry[0][:time]} #{swimmer_series_entry[0][:place]}.)"
+              
+              #delete the series entry, we don't need it anymore
+              swimmers =  swimmers.reject{|a| (a[:name] == swimmer[:name]) &&  (a[:round] == translation["PRE"])}
+            end
+          end
+        end #find finalist and delete series entry - loop
+        
         disq_swimmers = []
         swimmers.each do |swimmer|
           if swimmer[:place].eql?(-1) then
             disq_swimmers.push("disq. #{swimmer[:name]} #{swimmer[:time]} ")
           else
-            print "#{swimmer[:place]}. #{swimmer[:name]} (#{swimmer[:club]}) #{swimmer[:time]}. " 
+            
+            # if this is a time swum in a final, find the series time
+            #finale_time = swimmer[:round].eql?(translation["FIN"]) 
+            #print swimmers.size
+            print "#{swimmer[:place]}. #{swimmer[:name]} (#{swimmer[:club]}) #{swimmer[:time]} " 
           end
         end
       
